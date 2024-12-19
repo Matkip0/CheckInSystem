@@ -12,6 +12,8 @@ using PCSC.Iso7816;
 
 namespace CheckInSystem.CardReader;
 
+using Database;
+
 public class ACR122U
 {
     public static readonly Reader Reader = new Reader();
@@ -116,10 +118,13 @@ public class ACR122U
         }
 
         string insertQuery = "EXEC CardScanned @cardID";
-        using (var connection = new SqlConnection(Database.Database.ConnectionString))
-        {
-            connection.Query(insertQuery, new {cardID = cardID});
-        }
+
+        using var connection = Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        connection.Query(insertQuery, new {cardID = cardID});
+
         UpdateEmployeeLocal(cardID);
     }
 

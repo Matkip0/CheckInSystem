@@ -3,9 +3,11 @@ using System.ComponentModel;
 using System.Data.SqlClient;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using CheckInSystem.Database;
 using Dapper;
 
 namespace CheckInSystem.Models;
+
 
 public class Group : INotifyPropertyChanged
 {
@@ -32,27 +34,29 @@ public class Group : INotifyPropertyChanged
         string selectQueryGroups = @"SELECT * FROM [group]";
         string selectQueryEmployeesInGroup = @"SELECT employeeID FROM employeeGroup WHERE groupID = {0}";
         
-        using (var connection = new SqlConnection(Database.Database.ConnectionString))
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        var groups = connection.Query<Group>(selectQueryGroups).ToList();
+
+        foreach (var group in groups)
         {
-            var groups = connection.Query<Group>(selectQueryGroups).ToList();
+            string formattedQuery = string.Format(selectQueryEmployeesInGroup, group.ID);
+            var employeeIDs = connection.Query<int>(formattedQuery).ToList();
+            group.Members = new ObservableCollection<Employee>();
 
-            foreach (var group in groups)
+            foreach (var employeeID in employeeIDs)
             {
-                string formattedQuery = string.Format(selectQueryEmployeesInGroup, group.ID);
-                var employeeIDs = connection.Query<int>(formattedQuery).ToList();
-                group.Members = new ObservableCollection<Employee>();
-
-                foreach (var employeeID in employeeIDs)
+                var temp = employees.Where(i => i.ID == employeeID).FirstOrDefault();
+                if (temp != null)
                 {
-                    var temp = employees.Where(i => i.ID == employeeID).FirstOrDefault();
-                    if (temp != null)
-                    {
-                        group.Members.Add(temp);
-                    }
+                    group.Members.Add(temp);
                 }
             }
-            return groups;
         }
+
+        return groups;
     }
 
     public static Group NewGroup(String name)
@@ -64,10 +68,13 @@ public class Group : INotifyPropertyChanged
             Name = name,
             Members = new ObservableCollection<Employee>()
         };
-        using (var connection = new SqlConnection(Database.Database.ConnectionString))
-        {
-            newGroup.ID = connection.QueryFirst<int>(insertQuery, new {name = name});
-        }
+
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        newGroup.ID = connection.QueryFirst<int>(insertQuery, new {name = name});
+
         return newGroup;
     }
 
@@ -75,10 +82,11 @@ public class Group : INotifyPropertyChanged
     {
         string deletionQuery = @"DELETE [group] WHERE ID = @ID";
         
-        using (var connection = new SqlConnection(Database.Database.ConnectionString))
-        {
-            connection.Query(deletionQuery, new { ID = this.ID });
-        }
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        connection.Query(deletionQuery, new { ID = this.ID });
     }
 
     public void UpdateName(string name)
@@ -86,10 +94,12 @@ public class Group : INotifyPropertyChanged
         string updateQuery = @"UPDATE [group] 
             SET name = @name
             WHERE ID = @ID";
-        using (var connection = new SqlConnection(Database.Database.ConnectionString))
-        {
-            connection.Query(updateQuery, new {name = name, ID = this.ID});
-        }
+
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        connection.Query(updateQuery, new {name = name, ID = this.ID});
 
         this.Name = name;
     }
@@ -99,10 +109,12 @@ public class Group : INotifyPropertyChanged
         string updateQuery = @"UPDATE [group] 
             SET isvisible = @isvisible
             WHERE ID = @ID";
-        using (var connection = new SqlConnection(Database.Database.ConnectionString))
-        {
-            connection.Query(updateQuery, new {isvisible = Isvisible, ID = this.ID});
-        }
+
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        connection.Query(updateQuery, new {isvisible = Isvisible, ID = this.ID});
     }
     
     public void AddEmployee(Employee employee)
@@ -111,10 +123,12 @@ public class Group : INotifyPropertyChanged
         
         string insertQuery = @"INSERT INTO employeeGroup (employeeID, groupID) VALUES (@employeeID, @groupID)";
 
-        using (var connection = new SqlConnection(Database.Database.ConnectionString))
-        {
-            connection.Query(insertQuery, new { employeeID = employee.ID, @groupID = this.ID });
-        }
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        connection.Query(insertQuery, new { employeeID = employee.ID, @groupID = this.ID });
+
         this.Members.Add(employee);
     }
 
@@ -123,10 +137,12 @@ public class Group : INotifyPropertyChanged
         if (!Members.Contains(employee)) return;
         
         string deletionQuery = @"DELETE employeeGroup WHERE employeeID = @employeeID AND groupID = @groupID";
-        using (var connection = new SqlConnection(Database.Database.ConnectionString))
-        {
-            connection.Query(deletionQuery, new { employeeID = employee.ID, @groupID = this.ID });
-        }
+
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        connection.Query(deletionQuery, new { employeeID = employee.ID, @groupID = this.ID });
 
         this.Members.Remove(employee);
     }

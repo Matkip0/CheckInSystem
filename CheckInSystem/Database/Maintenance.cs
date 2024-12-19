@@ -2,6 +2,7 @@
 using System.Windows;
 using CheckInSystem.Models;
 using CheckInSystem.ViewModels;
+using System.Diagnostics;
 using Dapper;
 
 namespace CheckInSystem.Database;
@@ -40,9 +41,23 @@ public class Maintenance
                             SET departureTime = @DepartureTime
                             WHERE employeeID = @ID AND arrivalTime = @ArrivalTime";
         
-        using (var connection = new SqlConnection(Database.ConnectionString))
+        try
         {
+            using var connection = Database.GetConnection();
+            if (connection == null)
+                throw new Exception("Could not establish database connection!");
+
             var siteTime = connection.Execute(updatequery, employee);
+        }
+        catch (SqlException e)
+        {
+            Debug.WriteLine(e);
+            MessageBox.Show($"Database Fejl: {e.Message}", "Fejl", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        catch (Exception e)
+        {
+            Debug.WriteLine(e);
+            MessageBox.Show($"Der opstod en fejl: {e.Message}", "Fejl", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

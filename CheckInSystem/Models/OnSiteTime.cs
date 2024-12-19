@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Data.SqlClient;
 using System.Runtime.CompilerServices;
+using CheckInSystem.Database;
 using Dapper;
 
 namespace CheckInSystem.Models;
@@ -65,13 +66,14 @@ public class OnSiteTime : INotifyPropertyChanged
         string selectQuery = @"SELECT * FROM onSiteTime 
             where employeeID = @employeeID";
         
-        using (var connection = new SqlConnection(Database.Database.ConnectionString))
-        {
-            var onSiteTimes = connection.Query<OnSiteTime>(selectQuery, new { employeeID = employee.ID })
-                .Select(t => new OnSiteTime(t)).ToList();
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        var onSiteTimes = connection.Query<OnSiteTime>(selectQuery, new { employeeID = employee.ID })
+            .Select(t => new OnSiteTime(t)).ToList();
             
-            return onSiteTimes;
-        }
+        return onSiteTimes;
     }
 
     public bool IsChanged()
@@ -90,10 +92,12 @@ public class OnSiteTime : INotifyPropertyChanged
     public void DeleteFromDb()
     {
         string deletionQuery = @"DELETE FROM onSiteTime WHERE ID = @id";
-        using (var connection = new SqlConnection(Database.Database.ConnectionString))
-        {
-            connection.Query(deletionQuery, new { id = Id });
-        }
+
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        connection.Query(deletionQuery, new { id = Id });
     }
 
     public static void UpdateMutipleSiteTimes(List<OnSiteTime> siteTimes)
@@ -102,10 +106,12 @@ public class OnSiteTime : INotifyPropertyChanged
                       arrivalTime = @ArrivalTime,
                       departureTime = @DepartureTime
                       WHERE ID = @Id";
-        using (var connection = new SqlConnection(Database.Database.ConnectionString))
-        {
-            connection.Execute(UpdateQuery, siteTimes);
-        }
+
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        connection.Execute(UpdateQuery, siteTimes);
     }
 
     public static OnSiteTime AddTimeToDb(int employeeId, DateTime arrivalTime, DateTime? departureTime)
@@ -113,11 +119,14 @@ public class OnSiteTime : INotifyPropertyChanged
         string insertQuery = @"INSERT INTO onSiteTime (employeeID, arrivalTime, departureTime)
                         VALUES (@employeeId, @arrivalTime, @departureTime)
                         SELECT SCOPE_IDENTITY()";
-        using (var connection = new SqlConnection(Database.Database.ConnectionString))
-        {
-            var siteTimeId = connection.ExecuteScalar<int>(insertQuery, new { employeeId, arrivalTime, departureTime });
-            return new OnSiteTime(siteTimeId, employeeId, arrivalTime, departureTime);
-        }
+
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        var siteTimeId = connection.ExecuteScalar<int>(insertQuery, new { employeeId, arrivalTime, departureTime });
+
+        return new OnSiteTime(siteTimeId, employeeId, arrivalTime, departureTime);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

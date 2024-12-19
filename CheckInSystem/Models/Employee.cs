@@ -1,11 +1,11 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Dapper;
+using System.Data.SqlClient;
+using CheckInSystem.Database;
 
 namespace CheckInSystem.Models;
 
-using Dapper;
-using Database;
-using System.Data.SqlClient;
 
 public class Employee : INotifyPropertyChanged
 {
@@ -73,9 +73,10 @@ public class Employee : INotifyPropertyChanged
     {
         Employee? tempEmployee = GetFromCardId(cardID);
         if (tempEmployee == null) return;
-        ArrivalTime = tempEmployee.ArrivalTime;
-        DepartureTime = tempEmployee.DepartureTime;
-        IsCheckedIn = tempEmployee.IsCheckedIn;
+
+        SetProperty(ref _arrivalTime, tempEmployee.ArrivalTime, nameof(ArrivalTime));
+        SetProperty(ref _departureTime, tempEmployee.DepartureTime, nameof(DepartureTime));
+        SetProperty(ref _isCheckedIn, tempEmployee.IsCheckedIn, nameof(IsCheckedIn));
     }
     
     public static List<Employee> GetAllEmployees()
@@ -88,11 +89,13 @@ public class Employee : INotifyPropertyChanged
             FROM OnSiteTime
             WHERE employee.ID = OnSiteTime.employeeID
             ORDER BY arrivalTime DESC)";
-        using (var connection = new SqlConnection(Database.ConnectionString))
-        {
-            var employees = connection.Query<Employee>(selectQuery).ToList();
-            return employees;
-        }
+
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        var employees = connection.Query<Employee>(selectQuery).ToList();
+        return employees;
     }
 
     public static Employee? GetFromCardId(string cardID)
@@ -106,11 +109,13 @@ public class Employee : INotifyPropertyChanged
             WHERE employee.ID = OnSiteTime.employeeID
             ORDER BY arrivalTime DESC)
             WHERE cardID = @cardID";
-        using (var connection = new SqlConnection(Database.ConnectionString))
-        {
-            var employees = connection.Query<Employee>(selectQuery, new {cardID = cardID}).FirstOrDefault();
-            return employees;
-        }
+
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        var employees = connection.Query<Employee>(selectQuery, new {cardID = cardID}).FirstOrDefault();
+        return employees;
     }
 
     public void GetUpdatedSiteTimes()
@@ -118,16 +123,19 @@ public class Employee : INotifyPropertyChanged
         string selectQuery = @"Select TOP(1) * FROM onSiteTime
                         WHERE employeeID = @ID
                         ORDER BY arrivalTime desc";
+
         try
         {
-            using (var connection = new SqlConnection(Database.ConnectionString))
-            {
-                var siteTime = connection.QuerySingle<OnSiteTime>(selectQuery, this);
-                ArrivalTime = siteTime.ArrivalTime;
-                DepartureTime = siteTime.DepartureTime;
-            }
+            using var connection = Database.Database.GetConnection();
+            if (connection == null)
+                throw new Exception("Could not establish database connection!");
+            
+            var siteTime = connection.QuerySingle<OnSiteTime>(selectQuery, this);
+
+            ArrivalTime = siteTime.ArrivalTime;
+            DepartureTime = siteTime.DepartureTime;
         }
-        catch (Exception e)
+        catch (Exception)
         {
             ArrivalTime = null;
             DepartureTime = null;
@@ -146,20 +154,22 @@ public class Employee : INotifyPropertyChanged
             offSiteUntil = @OffSiteUntil
             WHERE ID = @id";
         
-        using (var connection = new SqlConnection(Database.ConnectionString))
-        {
-            connection.Query(updateQuery, this);
-        }
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        connection.Query(updateQuery, this);
     }
 
     public void DeleteFromDb()
     {
         string deletionQuery = @"DELETE employee WHERE ID = @ID";
         
-        using (var connection = new SqlConnection(Database.ConnectionString))
-        {
-            connection.Query(deletionQuery, this);
-        }
+        using var connection = Database.Database.GetConnection();
+        if (connection == null)
+            throw new Exception("Could not establish database connection!");
+
+        connection.Query(deletionQuery, this);
     }
     
     public event PropertyChangedEventHandler? PropertyChanged;
